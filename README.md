@@ -1,120 +1,162 @@
 # Therapeutic Intelligence System (TIS)
 
-A **config-driven therapeutic + market intelligence engine** for pharma/biotech competitive analysis.
+An **Agno-based, config-driven therapeutic + market intelligence engine** for pharma/biotech competitive analysis.
 
-## 1) Final Blueprint
+## 1) Final Blueprint (Agno-first)
 
-### 1.1 Problem statement
+### 1.1 Business problem
 Competitive intelligence teams need fast, evidence-backed answers to questions such as:
 - Compare one company vs top competitors in a disease/target landscape.
-- Track changes since a time cutoff.
-- Restrict to specific geographies, trial phases, or evidence types.
+- Track what changed since a time cutoff.
+- Restrict to geography, trial phase, status, or source-specific scope.
 
-The system must replace manual, slow, inconsistent workflows with a reproducible pipeline.
+Manual workflows (ClinicalTrials.gov + PubMed + press + pipeline scans) are slow, inconsistent, and hard to audit.
 
 ### 1.2 System goal
-Build a hybrid deterministic + agentic system that:
-1. Accepts natural language intelligence queries.
-2. Converts them into strict structured config.
-3. Retrieves evidence deterministically from trusted sources.
-4. Normalizes all evidence into canonical objects.
-5. Runs domain analyst agents on structured evidence.
+Build a **deterministic + agentic** intelligence system that:
+1. Accepts natural language queries.
+2. Maps each request to a strict `QueryConfig`.
+3. Retrieves trusted evidence deterministically.
+4. Normalizes evidence into canonical objects.
+5. Runs Agno analyst agents on structured evidence.
 6. Validates outputs to prevent hallucinations.
-7. Renders stable, traceable reports.
-8. Supports multi-turn refinements via config patches.
+7. Renders stable markdown reports with citations.
+8. Supports multi-turn refinements using config deltas.
 
 ### 1.3 Core constraints
-- High factuality and evidence traceability.
-- Auditability and reproducibility per run.
-- Stable template formatting.
-- Safe, deterministic tool layer with controlled sources.
-- Graceful partial-output behavior on failures.
+- High factuality and strict evidence traceability.
+- Full run auditability and replay.
+- Stable report templates.
+- Controlled tool usage (no uncontrolled browsing).
+- Graceful partial output under source/tool failure.
+
+---
 
 ## 2) Product definition
 
 ### 2.1 User surfaces
-- Chat-like interface and/or API endpoint.
-- Full-report and partial-answer requests.
-- Follow-up refinements (time, geography, scope, filters).
+- Chat-style interface and/or FastAPI endpoint.
+- Full report and partial report requests.
+- Follow-up refinements (time, geography, phase, scope).
 
 ### 2.2 Output types
-- Full markdown report (presentation-grade).
-- Evidence appendix (NCT / PMID / URL references).
+- Full markdown report.
+- Evidence appendix (NCT / PMID / URL).
 - Competitor ranking tables.
 - Partial outputs:
   - market-only digest
   - clinical-only landscape
   - scientific-only digest
   - ranking-only output
-  - delta report (what changed since X)
+  - delta report ("what changed since X")
 
-## 3) Requirements
+---
 
-### 3.1 Functional requirements
-1. **Natural language query classification** into finite workflows:
-   - `competitive_intelligence`
-   - `market_digest`
-   - `clinical_trials_landscape`
-   - `scientific_digest`
-   - `target_landscape`
-   - `indication_landscape`
-   - `delta_report`
-2. **Query → Config conversion** to validated `QueryConfig`.
-3. **Multi-turn refinement** via `ConversationState` + `DeltaConfig`.
-4. **Deterministic evidence retrieval** from:
+## 3) Workflow types (finite set)
+
+Every query maps to one workflow:
+- `competitive_intelligence`
+- `market_digest`
+- `clinical_trials_landscape`
+- `scientific_digest`
+- `target_landscape`
+- `indication_landscape`
+- `delta_report`
+
+---
+
+## 4) Agno-aligned architecture
+
+### 4.1 End-to-end flow
+`User Query -> Intent Router -> Query Router -> QueryConfig -> Retrieval Plan -> Deterministic Fetchers -> Canonicalization -> Agno Analyst Agents -> Validator -> Synthesis -> Markdown Renderer -> Run Store`
+
+### 4.2 Design principle
+This is **not** free-form browsing with an LLM.
+It is a **deterministic evidence pipeline** with Agno agents only for interpretation/synthesis.
+
+### 4.3 Agno role in the stack
+Use Agno for:
+- agent definitions and role prompts
+- controlled orchestration of analyst steps
+- structured IO contracts between stages
+
+Keep deterministic modules outside agents for:
+- retrieval
+- normalization
+- validation checks
+- storage/replay
+
+---
+
+## 5) Requirements
+
+### 5.1 Functional requirements
+1. Query classification into supported workflows.
+2. Query -> strict `QueryConfig` conversion.
+3. Multi-turn refinement via `DeltaConfig` patches.
+4. Deterministic retrieval from:
    - ClinicalTrials.gov
    - PubMed
    - curated market news
    - company pipeline pages
    - press releases
-5. **Canonical normalization** to:
+5. Canonical normalization into:
    - `ClinicalTrial`
    - `Publication`
    - `MarketEvent`
    - `PipelineAsset`
-6. **Evidence traceability** for every major claim.
-7. **Analyst reasoning** for clinical/scientific/market/competitor insights.
-8. **Validation controls** to block unsupported claims.
-9. **Output rendering** to markdown (PDF optional later).
-10. **Run storage** for replay and audit.
+6. Evidence traceability for each major claim.
+7. Analyst outputs for clinical/scientific/market/ranking dimensions.
+8. Validation gate that removes/blocks unsupported claims.
+9. Stable markdown rendering (versioned templates).
+10. Run artifact storage for replay and audit.
 
-### 3.2 Non-functional requirements
-- Reliability with retries and partial-result fallback.
-- Compliance-ready audit trail (tool logs, artifacts, replayability).
-- Deterministic/stable structure for same config.
-- Security: auth, allowlist outbound domains, no uncontrolled browsing.
-- Maintainability: strict schemas + modular interfaces.
-- Performance: POC 30–120s; production 20–60s with caching.
+### 5.2 Non-functional requirements
+- Reliability: retries + partial-result fallback.
+- Auditability: tool logs + artifact persistence + replay.
+- Stability: deterministic structure for same config.
+- Security: JWT auth (prod), allowlisted outbound domains, no arbitrary code execution.
+- Maintainability: strict schemas (Pydantic), modular contracts.
+- Performance: POC 30–120s, target 20–60s with caching.
 - Scalability: easy source/template/workflow extension.
 
-## 4) Architecture
+---
 
-### 4.1 End-to-end flow
-`User Query -> Intent Router -> Query Router -> QueryConfig -> Workflow -> Evidence Fetch -> Canonical Normalize -> Analyst Agents -> Validator -> Synthesis -> Renderer -> Run Store`
+## 6) Agents (Agno implementation plan)
 
-### 4.2 Design principle
-This is **not** “LLM with ad-hoc tools.”
-It is a **deterministic data pipeline with an LLM interpretation layer**.
-- Deterministic layers own truth, structure, and retrieval.
-- Agents own interpretation and synthesis.
-- Validator enforces evidence integrity.
+### 6.1 Agent list
+1. **Intent Router Agent**
+   - Output: `new_query | refinement | follow_up | out_of_domain`
+2. **Query Router Agent**
+   - Output: validated `QueryConfig`
+3. **Clinical Analyst Agent**
+   - Input: canonical trials
+   - Output: trial landscape insights + key trials
+4. **Scientific Analyst Agent**
+   - Input: canonical publications
+   - Output: MoA / novelty / resistance insights
+5. **Market Analyst Agent**
+   - Input: market events + pipeline assets
+   - Output: strategic signals
+6. **Competitor Ranker Agent**
+   - Input: consolidated evidence features
+   - Output: top-k ranking + explicit scoring logic
+7. **Validator/Auditor Agent**
+   - Input: claims + canonical evidence
+   - Output: issue list (`LOW|MEDIUM|HIGH`)
+8. **Synthesizer Agent**
+   - Input: validated sections
+   - Output: report blocks ready for rendering
 
-## 5) Agent system (minimum complete set)
-1. **Intent Router Agent**: classify message (`new_query`, `refinement`, `follow_up`, `out_of_domain`).
-2. **Query Router Agent**: generate strict `QueryConfig` JSON.
-3. **Evidence Planner Agent** (optional): choose retrieval plan.
-4. **Clinical Analyst Agent**: analyze trials.
-5. **Scientific Analyst Agent**: analyze publications.
-6. **Market Analyst Agent**: analyze market and pipeline signals.
-7. **Competitor Ranker Agent**: top-k competitor scoring.
-8. **Validator/Auditor Agent**: evidence alignment and contradiction checks.
-9. **Synthesizer Agent**: compose report-ready structured sections.
+### 6.2 Memory policy
+- No hidden long-term memory inside agents.
+- State is deterministic in `ConversationState` + run artifacts.
 
-All agents run memory-light with explicit structured inputs.
+---
 
-## 6) Deterministic tools and contracts
+## 7) Deterministic tools and contracts
 
-### 6.1 Tooling
+### 7.1 Tool inventory
 - `clinicaltrials_fetcher`
 - `pubmed_fetcher`
 - `market_news_fetcher`
@@ -125,7 +167,7 @@ All agents run memory-light with explicit structured inputs.
 - cache store
 - run artifact store
 
-### 6.2 Mandatory return contract
+### 7.2 Mandatory tool return schema
 ```json
 {
   "status": "ok|error",
@@ -137,30 +179,26 @@ All agents run memory-light with explicit structured inputs.
 }
 ```
 
-## 7) ICD-10 and ClinVar integration policy
+---
 
-### 7.1 ICD-10 (recommended)
-Use ICD-10 in the ontology/normalization layer for:
+## 8) Ontology and coding layer
+
+### 8.1 ICD-10 (recommended)
+Use ICD-10 for:
 - indication normalization
 - synonym expansion
-- deterministic filtering and refinement
-- better retrieval consistency
+- deterministic filtering/refinement
+- retrieval query quality
 
-Store ICD-10 in canonical indication attributes and QueryConfig.
+Store codes in canonical indication fields and in `QueryConfig` when available.
 
-### 7.2 ClinVar (optional, variant-centric)
-Use ClinVar only for variant-specific genomics workflows (e.g., resistance variants).
-Do **not** treat it as a primary source for market intelligence or broad competitor analysis.
+### 8.2 ClinVar (optional)
+Use ClinVar only for variant-centric workflows (e.g., EGFR exon-level intelligence).
+Do not rely on ClinVar for market events or broad competitor intelligence.
 
-## 8) Failure handling and safety policy
-- Retry: 3 attempts with exponential backoff.
-- Per-source timeouts and rate-limit handling.
-- Partial evidence fallback with warnings + confidence adjustment.
-- Agent schema failure: rerun once with stricter prompt.
-- Persisting failure: return empty section with `insufficient evidence`.
-- HIGH-severity validator issues must be corrected or removed before final report.
+---
 
-## 9) Core data contracts
+## 9) Core contracts
 
 ### 9.1 QueryConfig
 Must include:
@@ -171,26 +209,49 @@ Must include:
 - geography
 - time window
 - filters (phase/status)
-- requested output format
+- output format
 - template version
 
 ### 9.2 ConversationState
 Stores:
-- active QueryConfig
-- last run id
+- active `QueryConfig`
+- `last_run_id`
 - cached evidence keys
 - user preferences
 
 ### 9.3 DeltaConfig
-Represents refinements (time/geo/filter/scope changes) to patch previous config.
+Patch object for refinement turns (time/geo/filter/scope changes).
 
-## 10) Versioned rendering
-- Template files versioned (e.g., `report_v2_1`).
-- Renderer enforces section order, required blocks, and appendix.
-- Includes limitation/warning sections when evidence is partial.
+---
 
-## 11) Notebook-first implementation plan
-Implement in this order:
+## 10) Validation and failure policy
+
+### 10.1 Retry and fallback
+- 3 retries with exponential backoff.
+- Source-level timeouts and rate-limit handling.
+- Partial evidence allowed with explicit warnings.
+
+### 10.2 Agent fallback
+- If schema validation fails: rerun once with stricter instructions.
+- If still invalid: emit empty section + `insufficient evidence` note.
+
+### 10.3 Validator enforcement
+- HIGH-severity issues must be fixed or removed before final report.
+- No unsupported claim passes to rendering.
+
+---
+
+## 11) Rendering policy
+- Versioned templates (e.g., `report_v2_1`).
+- Fixed section order and required blocks.
+- Mandatory evidence appendix.
+- Limitations/warnings section when evidence is partial.
+
+---
+
+## 12) Agno-first implementation plan
+
+### 12.1 Notebook sequence
 1. system overview + schemas
 2. intent router
 3. query router
@@ -199,40 +260,45 @@ Implement in this order:
 6. PubMed fetcher
 7. market + pipeline fetchers
 8. canonicalization
-9. clinical analyst
-10. scientific analyst
-11. market analyst
-12. competitor ranker
-13. validator
+9. clinical analyst (Agno)
+10. scientific analyst (Agno)
+11. market analyst (Agno)
+12. competitor ranker (Agno)
+13. validator (Agno + deterministic checks)
 14. fix/rerun loop
 15. synthesis + renderer
-16. end-to-end notebook
+16. end-to-end run notebook
 17. multi-turn refinement notebook
-18. modularization checklist notebook
+18. modularization checklist
 
-## 12) Modularization target structure
+### 12.2 Module layout (production-ready)
 - `tis_core/schemas`
 - `tis_core/tools`
 - `tis_core/normalizers`
-- `tis_core/agents`
-- `tis_core/orchestrator`
+- `tis_core/agents` *(Agno agent definitions)*
+- `tis_core/workflows` *(Agno orchestration + stage runners)*
+- `tis_core/validators`
 - `tis_core/rendering`
 - `tis_core/storage`
-- `app/` (FastAPI)
+- `app/` *(FastAPI endpoints + auth + middleware)*
 
-## 13) POC to production phases
-- **Phase 0**: schemas, run storage, query routing.
-- **Phase 1**: deterministic retrieval + normalization.
-- **Phase 2**: clinical/scientific agents + markdown rendering.
-- **Phase 3**: market intelligence + competitor ranking.
-- **Phase 4**: validator hardening + multi-turn support.
-- **Phase 5**: API modularization, auth, observability, production infra.
+---
+
+## 13) POC -> production phases
+- **Phase 0:** schemas, logging, run store, query routing.
+- **Phase 1:** retrieval + canonicalization + caching/retries.
+- **Phase 2:** clinical/scientific Agno agents + markdown rendering.
+- **Phase 3:** market + competitor ranking agents.
+- **Phase 4:** validator hardening + multi-turn delta execution.
+- **Phase 5:** FastAPI packaging, auth hardening, observability, jobs.
+
+---
 
 ## 14) Acceptance criteria
 System is complete when it can:
 - answer 20+ diverse in-domain queries,
 - support multi-turn refinements,
-- produce stable template-driven outputs,
+- produce stable template-driven reports,
 - include evidence appendix and citations,
-- block unsupported claims,
+- block unsupported claims via validation,
 - store complete run artifacts for replay.
